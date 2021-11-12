@@ -16,9 +16,36 @@ if sys.stdout.encoding != 'UTF-8':
 if sys.stderr.encoding != 'UTF-8':
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
+# ------------------ Definitions ------------------
+
 color_list = ["firebrick","salmon","orange","burlywood","olive","yellowgreen","lightgreen","turquoise","lightskyblue","royalblue","mediumorchid","hotpink"]
 
 # ------------------ Fonctions ------------------
+
+def tick_month_1():
+    tick_month("1")
+
+def tick_month_3():
+    tick_month("3")
+
+def tick_month_6():
+    tick_month("6")
+
+def tick_month(n):
+    for i, int in enumerate(week_ticked):
+        if (week_list[i][1] == "0" or week_list[i][1] == n):
+            int.set(1)
+        else:
+            int.set(0)
+    set_week_to_plot()
+
+def tick_every_month():
+    for i, int in enumerate(week_ticked):
+        if "+" in week_list[i]:
+            int.set(0)
+        else:
+            int.set(1)
+    set_week_to_plot()
 
 def set_param_to_plot():
     for i, int in enumerate(param_ticked):
@@ -178,6 +205,7 @@ def plot_view(data, param, plot_id):
     tmp_values = []
 
     plt.figure(plot_id)
+    ax = plt.subplot(111)
 
     for week, has_to_be_plotted in week_to_plot.items():
         if has_to_be_plotted == 1:
@@ -195,13 +223,18 @@ def plot_view(data, param, plot_id):
 
     for sample, has_to_be_plotted in sample_to_plot.items():
         if has_to_be_plotted == 1:
-            plt.plot(abscisse, sample_values[sample], label=sample, color=color_list[i], linewidth=2)
+            ax.plot(abscisse, sample_values[sample], label=sample, color=color_list[i], linewidth=2)
         i+=1
     
     plt.title("Evolution du "+param+" de "+abscisse[0]+" à "+abscisse[len(abscisse)-1])
     
-    plt.legend(loc='upper right')
+    # Shrink current axis's height by 10% on the bottom
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width * 0.9, box.height * 0.9])
+
+    plt.legend(bbox_to_anchor=(1,1), loc="upper left")
     plt.xlabel("Temps (mois)")
+    plt.xticks(rotation=70)
     plt.ylabel(param_unit[param])
 
 def load_file():
@@ -209,9 +242,24 @@ def load_file():
     filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
     entry_path.insert(tk.END, filename)
     raw_data = pd.read_excel(filename, index_col=None, header=None)
+
     display_param(raw_data, int(entry_param.get()))
     display_sample_list(raw_data, entry_sample_col.get(), entry_sample_1.get(), int(entry_sample_nb.get()))
     display_week_list(raw_data, entry_sample_col.get(), entry_sample_1.get())
+    
+    window.geometry("1100x700")
+
+    btn_1mois = tk.Button(window, text = "Après 1 mois", command=tick_month_1, width=10)
+    btn_1mois.place(x = 300, y = 310)
+
+    btn_3mois = tk.Button(window, text = "Après 3 mois", command=tick_month_3, width=10)
+    btn_3mois.place(x = 300, y = 350)
+
+    btn_6mois = tk.Button(window, text = "Après 6 mois", command=tick_month_6, width=10)
+    btn_6mois.place(x = 300, y = 390)
+
+    btn_6mois = tk.Button(window, text = "Chaque mois", command=tick_every_month, width=10)
+    btn_6mois.place(x = 300, y = 430)
 
 def go_graph():
     plot_id=0
@@ -245,9 +293,8 @@ def collect_data(param, plot_id):
 if __name__ == '__main__':
     global window
     window = tk.Tk()
-    window.title("Excetext_paramgraph")
-    window.iconbitmap("./icon.ico")
-    window.geometry("1100x700")
+    window.title("excel2graph")
+    window.geometry("450x270")
     window.resizable(0, 0)
 
     text_path = tk.Label(window, text = "Fichier excel")
@@ -257,29 +304,32 @@ if __name__ == '__main__':
     button_path=tk.Button(window, text = "Chercher...", command=load_file, width=10)
     button_path.place(x = 300, y = 20)
 
+    text_advanced_param = tk.Label(window, text = "Réglages avancés:")
+    text_advanced_param.place(x = 20, y = 63)
+
     text_param = tk.Label(window, text = "Ligne des paramètres")
-    text_param.place(x = 20, y = 63)
+    text_param.place(x = 20, y = 103)
     entry_param = tk.Entry(window, bd = 3, width=2)
     entry_param.insert(tk.END, "7")
-    entry_param.place(x = 255, y = 60)
+    entry_param.place(x = 255, y = 100)
 
     text_sample_col = tk.Label(window, text = "Colonne des échantillons")
-    text_sample_col.place(x = 20, y = 103)
+    text_sample_col.place(x = 20, y = 143)
     entry_sample_col = tk.Entry(window, bd = 3, width=2)
     entry_sample_col.insert(tk.END, "C")
-    entry_sample_col.place(x = 255, y = 100)
+    entry_sample_col.place(x = 255, y = 140)
 
     text_sample_1 = tk.Label(window, text = "Premier échantillon")
-    text_sample_1.place(x = 20, y = 143)
+    text_sample_1.place(x = 20, y = 183)
     entry_sample_1 = tk.Entry(window, bd = 3, width=2)
     entry_sample_1.insert(tk.END, "A0")
-    entry_sample_1.place(x = 255, y = 140)
+    entry_sample_1.place(x = 255, y = 180)
 
     text_sample_nb = tk.Label(window, text = "Nombre d'échantillons")
-    text_sample_nb.place(x = 20, y = 183)
+    text_sample_nb.place(x = 20, y = 223)
     entry_sample_nb = tk.Entry(window, bd = 3, width=2)
     entry_sample_nb.insert(tk.END, "12")
-    entry_sample_nb.place(x = 255, y = 180)
+    entry_sample_nb.place(x = 255, y = 220)
 
     btn_go = tk.Button(window, text = "Go !", command=go_graph, width=20)
     btn_go.place(x = 700, y = 660)
