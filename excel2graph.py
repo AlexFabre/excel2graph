@@ -3,7 +3,7 @@
 
 # ------------------ Librairies ------------------
 import sys
-import threading
+from tkinter.constants import TRUE
 import pandas as pd
 import openpyxl
 import matplotlib.pyplot as plt
@@ -15,53 +15,6 @@ if sys.stdout.encoding != 'UTF-8':
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
 if sys.stderr.encoding != 'UTF-8':
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
-
-# ------------------ Constantes ------------------
-NB_ARG = 3
-Echantillon = ["A","B","C","D","E","F","G","H","I","J","K","L"]
-month_1_list = ["T0","T1", "T1+1", "T1+2", "T1+3", "T1+4", "T1+5", "T1+6", "T1+7", "T1+8", "T1+9"]
-month_3_list = ["T0","T3", "T3+1", "T3+2", "T3+3", "T3+4", "T3+5", "T3+6", "T3+7", "T3+8", "T3+9"]
-month_6_list = ["T0","T6", "T6+1", "T6+2", "T6+3", "T6+4", "T6+5", "T6+6", "T6+7", "T6+8", "T6+9"]
-Total_month_list = ["T0","T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"]
-Week_start_line = {
-        "T0": 10,
-        "T1": 22,
-        "T1+1": 35,
-        "T1+2": 47,
-        "T1+3": 59,
-        "T1+4": 71,
-        "T1+5": 83,
-        "T1+6": 95,
-        "T1+7": 107,
-        "T1+8": 119,
-        "T1+9": 131,
-        "T2": 144,
-        "T3": 156,
-        "T3+1": 168,
-        "T3+2": 180,
-        "T3+3": 192,
-        "T3+4": 204,
-        "T3+5": 216,
-        "T3+6": 228,
-        "T3+7": 240,
-        "T3+8": 252,
-        "T3+9": 264,
-        "T4": 276,
-        "T5": 288,
-        "T6": 300,
-        "T6+1": 312,
-        "T6+2": 324,
-        "T6+3": 336,
-        "T6+4": 348,
-        "T6+5": 360,
-        "T6+6": 372,
-        "T6+7": 384,
-        "T6+8": 396,
-        "T6+9": 408,
-        "T7": 420,
-        "T8": 432,
-    }
-
 
 global i
 i = 0
@@ -93,6 +46,106 @@ def get_param_row(raw_data, param):
     print("\033[91mERROR: 2nd argument does not match any parameter : "+param+"\033[0m")
     sys.exit(2)
 
+def get_param_list(raw_data, line):
+    param_list = []
+    p_list = raw_data.iloc[line-1:line].values[0]
+    for parameter in p_list:
+        if isinstance(parameter, str):
+            param_list.append(parameter)
+    return param_list
+
+def display_param(raw_data, line):
+    l = 0
+    c = 0
+    tk.Label(window, text = "Paramètres").place(x = 700, y = 20)
+    param_list = get_param_list(raw_data, line)
+    for param in param_list:
+        r = tk.Checkbutton(window, text=param, onvalue=1, offvalue=0)
+        r.place(x=460+c, y= 63+l)
+        c+=100
+        if(c == 600):
+            c=0
+            l+=30
+
+def get_sample_list(raw_data, col, first_sample, nb_sample):
+    sample_list = []
+    first_sample_found = False
+    n=0
+    
+    s_list = raw_data.iloc[0:, col:(col+1)]
+    for sample in s_list[col]:
+        if first_sample_found == True:
+            sample_list.append(''.join(i for i in sample if not i.isdigit()))
+            n+=1
+            if n == nb_sample:
+                break
+            continue
+        if isinstance(sample, str):
+            if sample == first_sample:
+                sample_list.append(''.join(i for i in sample if not i.isdigit()))
+                first_sample_found = True
+                n+=1
+
+    return sample_list
+
+def display_sample_list(raw_data, col, first_sample, nb_sample):
+    global sample_list
+    l=0
+    c=0
+    tk.Label(window, text = "Echantillons").place(x = 700, y = 180)
+
+    if isinstance(col, str):
+        col = ord(col) - ord("A")
+
+    sample_list = get_sample_list(raw_data, col, first_sample, nb_sample)
+    
+    for sample in sample_list:
+        r = tk.Checkbutton(window, text=sample, onvalue=1, offvalue=0)
+        r.select()
+        r.place(x=460+c, y= 203+l)
+        c+=100
+        if(c == 600):
+            c=0
+            l+=30
+
+def get_week_list(raw_data, col, first_sample):
+    week_list = []
+    week_lines = {}
+    i=0
+
+    first_sample = ''.join(i for i in first_sample if not i.isdigit())
+    
+    s_list = raw_data.iloc[0:, col:(col+1)]
+    for sample in s_list[col]:
+        if isinstance(sample, str):
+            if sample[0] == first_sample:
+                s = list(sample)
+                s[0] = "T"
+                week_list.append(''.join(s))
+                week_lines[sample] = i
+        i+=1
+
+    return week_list, week_lines
+
+def display_week_list(raw_data, col, first_sample):
+    l=0
+    c=0
+    tk.Label(window, text = "Semaines").place(x = 700, y = 280)
+
+    if isinstance(col, str):
+        col = ord(col) - ord("A")
+
+    week_list, week_lines = get_week_list(raw_data, col, first_sample)
+    
+    for sample in week_list:
+        r = tk.Checkbutton(window, text=sample, onvalue=1, offvalue=0)
+        r.place(x=460+c, y= 303+l)
+        c+=100
+        if(c == 600):
+            c=0
+            l+=30
+
+
 # Gives week start line in excel file from user input parameter
 def get_week_line(param):
     return Week_start_line[param]
@@ -120,15 +173,15 @@ def plot_view(data, param, view_type, unit, plot_id):
     for key, value in data.items():
         abscisse.append(key) # Getting T0, T1, T1+1 etc...
 
-    for ech in Echantillon:
+    for ech in sample_list:
         for key, value in data.items():
             ech_vals.append(value[param][ech]) # Getting A value for T0, then B value for T0, etc...
         
         full_vals[ech] = ech_vals.copy()
         ech_vals.clear()
         
-    for ech in range(len(Echantillon)):
-        plt.plot(abscisse, full_vals[Echantillon[ech]], label=Echantillon[ech])
+    for ech in range(len(sample_list)):
+        plt.plot(abscisse, full_vals[sample_list[ech]], label=sample_list[ech])
 
     if view_type == "T1+9":
         plt.title("Evolution du "+param+" après 1 mois")
@@ -144,11 +197,16 @@ def plot_view(data, param, view_type, unit, plot_id):
     plt.ylabel(unit)
     plt.show()
 
-def browsefunc():
-        filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
-        e1.insert(tk.END, filename)
+def charger_fichier():
+    global raw_data
+    filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
+    e1.insert(tk.END, filename)
+    raw_data = pd.read_excel(filename,index_col=None, header=None)
+    display_param(raw_data, int(e2.get()))
+    display_sample_list(raw_data, e3.get(), e4.get(), int(e5.get()))
+    display_week_list(raw_data, e3.get(), e4.get())
 
-def get_input():
+def get_user_choice():
     global i
     path = e1.get()
     param = e2.get()
@@ -156,12 +214,14 @@ def get_input():
     i+=1
     compute(path, param, view_type, i)
 
-def get_input_from_event(event):
-    get_input()
+def get_user_choice_from_event(event):
+    get_user_choice()
 
 def compute(path, param, view_type, plot_id):
     # Read excel file
-    raw_data = pd.read_excel(path, sheet_name="Données",index_col=None, header=None)
+    # raw_data = pd.read_excel(path, sheet_name="Données",index_col=None, header=None)
+
+    # get_param_list(raw_data, 7)
 
     # Getting column num for user input parameter
     row = get_param_row(raw_data, param)
@@ -187,52 +247,52 @@ def compute(path, param, view_type, plot_id):
     plot_view(data, param, view_type, unit, plot_id)
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        if len(sys.argv) < (NB_ARG+1):
-            print("\033[91mERROR: Missing arguments ! Arg 1 is excel path, arg 2 is parameter, and arg 3 is view type \033[0m")
-            sys.exit(1)
+    global window
+    window = tk.Tk()
+    window.title("Excel2graph")
+    window.iconbitmap("./icon.ico")
+    window.geometry("1100x700")
+    window.resizable(0, 0)
 
-        path = sys.argv[1]
-        param = sys.argv[2]
-        view_type = sys.argv[3]
+    l1 = tk.Label(window, text = "Fichier excel")
+    l1.place(x = 20, y = 23)
+    e1 = tk.Entry(window, bd = 3, width=15)
+    e1.place(x = 140, y = 20)
+    b1=tk.Button(window, text = "Chercher...", command=charger_fichier, width=10)
+    b1.place(x = 300, y = 20)
 
-        compute(path, param, view_type, 0)
+    l2 = tk.Label(window, text = "Ligne des paramètres")
+    l2.place(x = 20, y = 63)
+    e2 = tk.Entry(window, bd = 3, width=2)
+    e2.insert(tk.END, "7")
+    e2.place(x = 255, y = 60)
+
+    l3 = tk.Label(window, text = "Colonne des échantillons")
+    l3.place(x = 20, y = 103)
+    e3 = tk.Entry(window, bd = 3, width=2)
+    e3.insert(tk.END, "C")
+    e3.place(x = 255, y = 100)
+
+    l4 = tk.Label(window, text = "Premier échantillon")
+    l4.place(x = 20, y = 143)
+    e4 = tk.Entry(window, bd = 3, width=2)
+    e4.insert(tk.END, "A0")
+    e4.place(x = 255, y = 140)
+
+    l5 = tk.Label(window, text = "Nombre d'échantillons")
+    l5.place(x = 20, y = 183)
+    e5 = tk.Entry(window, bd = 3, width=2)
+    e5.insert(tk.END, "12")
+    e5.place(x = 255, y = 180)
+
+    btn = tk.Button(window, text = "Go !", command=get_user_choice, width=20)
+    btn.place(x = 700, y = 660)
+
+    l4 = tk.Label(window, text = "Version 2021.11.11")
+    l4.place(x = 20, y = 670)
+
+    window.bind('<Return>', get_user_choice_from_event)
     
-    else:
-        window = tk.Tk()
-        window.title("Excel2graph")
-        window.iconbitmap("./icon.ico")
-        window.geometry("500x200")
-        window.resizable(0, 0)
-
-        l1 = tk.Label(window, text = "Fichier excel")
-        l1.place(x = 10, y = 23)
-        e1 = tk.Entry(window, bd = 5, width=15)
-        e1.place(x = 140, y = 20)
-        b1=tk.Button(window, text = "Chercher...", command=browsefunc)
-        b1.place(x = 300, y = 20)
-
-        l2 = tk.Label(window, text = "Paramètre")
-        l2.place(x = 10, y = 63)
-        e2 = tk.Entry(window, bd = 5, width=15)
-        e2.place(x = 140, y = 60)
-        l22 = tk.Label(window, text = "CO2, SO2L,...")
-        l22.place(x = 300, y = 63)
-
-        l3 = tk.Label(window, text = "Durée du graphique")
-        l3.place(x = 10, y = 103)
-        e3 = tk.Entry(window, bd = 5, width=15)
-        e3.place(x = 140, y = 100)
-        l32 = tk.Label(window, text = "T1+9, T3+9, T6+9 ou T0T8")
-        l32.place(x = 300, y = 103)
-        btn = tk.Button(window, text = "Go!", command=get_input, width=20)
-        btn.place(x = 220, y = 160)
-
-        l4 = tk.Label(window, text = "Version 2021.11.11")
-        l4.place(x = 10, y = 170)
-
-        window.bind('<Return>', get_input_from_event)
-        
-        window.mainloop()
+    window.mainloop()
 
     sys.exit
