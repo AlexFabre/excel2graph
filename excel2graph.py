@@ -3,7 +3,7 @@
 
 # ------------------ Librairies ------------------
 import sys
-from tkinter.constants import TRUE
+from matplotlib import colors
 import pandas as pd
 import openpyxl
 import matplotlib.pyplot as plt
@@ -16,51 +16,52 @@ if sys.stdout.encoding != 'UTF-8':
 if sys.stderr.encoding != 'UTF-8':
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
-global i
-i = 0
+color_list = ["firebrick","salmon","orange","burlywood","olive","yellowgreen","lightgreen","turquoise","lightskyblue","royalblue","mediumorchid","hotpink"]
 
 # ------------------ Fonctions ------------------
 
-# Gives the week list to plot from user input view_type
-def get_weeks_to_plot(view_type):
-    if view_type == "T1+9":
-        return month_1_list
-    elif view_type == "T3+9":
-        return month_3_list
-    elif view_type == "T6+9":
-        return month_6_list
-    elif view_type == "T0T8":
-        return Total_month_list
-    else:
-        print("\033[91mERROR: 3rd argument must be either 'T1+9' or 'T3+9' or 'T6+9' or 'T0T8'\033[0m")
-        sys.exit(2)
+def set_param_to_plot():
+    for i, int in enumerate(param_ticked):
+        param_to_plot[param_list[i]] = int.get()
 
-# Gives row number in excel file from user input parameter
-def get_param_row(raw_data, param):
-    param_list = raw_data.iloc[6:7].values[0]
-    i = 0
-    for parameter in param_list:
-        if parameter == param:
-            return i
-        i+=1
-    print("\033[91mERROR: 2nd argument does not match any parameter : "+param+"\033[0m")
-    sys.exit(2)
+def set_sample_to_plot():
+    for i, int in enumerate(sample_ticked):
+        sample_to_plot[sample_list[i]] = int.get()
+
+def set_week_to_plot():
+    for i, int in enumerate(week_ticked):
+        week_to_plot[week_list[i]] = int.get()
 
 def get_param_list(raw_data, line):
+    global param_list
+    global param_to_plot
+    global param_col
+    global param_unit
     param_list = []
-    p_list = raw_data.iloc[line-1:line].values[0]
-    for parameter in p_list:
+    param_to_plot = {}
+    param_col = {}
+    param_unit = {}
+    i=0
+
+    p_list = raw_data.iloc[line-1:line+1]
+    for parameter in p_list.values[0]:
         if isinstance(parameter, str):
             param_list.append(parameter)
-    return param_list
+            param_col[parameter] = i
+            param_unit[parameter] = p_list.values[1][i]
+            param_to_plot[parameter] = 0
+        i+=1
 
 def display_param(raw_data, line):
+    global param_ticked
+    param_ticked = []
     l = 0
     c = 0
     tk.Label(window, text = "Paramètres").place(x = 700, y = 20)
-    param_list = get_param_list(raw_data, line)
+    get_param_list(raw_data, line)
     for param in param_list:
-        r = tk.Checkbutton(window, text=param, onvalue=1, offvalue=0)
+        param_ticked.append(tk.IntVar())
+        r = tk.Checkbutton(window, text=param, variable=param_ticked[-1], command=set_param_to_plot)
         r.place(x=460+c, y= 63+l)
         c+=100
         if(c == 600):
@@ -68,28 +69,35 @@ def display_param(raw_data, line):
             l+=30
 
 def get_sample_list(raw_data, col, first_sample, nb_sample):
+    global sample_list
+    global sample_to_plot
     sample_list = []
+    sample_to_plot = {}
     first_sample_found = False
     n=0
     
     s_list = raw_data.iloc[0:, col:(col+1)]
-    for sample in s_list[col]:
+    for s in s_list[col]:
         if first_sample_found == True:
-            sample_list.append(''.join(i for i in sample if not i.isdigit()))
+            sample = ''.join(i for i in s if not i.isdigit())
+            sample_list.append(sample)
+            sample_to_plot[sample] = 0
             n+=1
             if n == nb_sample:
                 break
             continue
-        if isinstance(sample, str):
-            if sample == first_sample:
-                sample_list.append(''.join(i for i in sample if not i.isdigit()))
+        if isinstance(s, str):
+            if s == first_sample:
+                sample = ''.join(i for i in s if not i.isdigit())
+                sample_list.append(sample)
+                sample_to_plot[sample] = 0
                 first_sample_found = True
                 n+=1
 
-    return sample_list
 
 def display_sample_list(raw_data, col, first_sample, nb_sample):
-    global sample_list
+    global sample_ticked
+    sample_ticked = []
     l=0
     c=0
     tk.Label(window, text = "Echantillons").place(x = 700, y = 180)
@@ -97,10 +105,11 @@ def display_sample_list(raw_data, col, first_sample, nb_sample):
     if isinstance(col, str):
         col = ord(col) - ord("A")
 
-    sample_list = get_sample_list(raw_data, col, first_sample, nb_sample)
+    get_sample_list(raw_data, col, first_sample, nb_sample)
     
     for sample in sample_list:
-        r = tk.Checkbutton(window, text=sample, onvalue=1, offvalue=0)
+        sample_ticked.append(tk.IntVar())
+        r = tk.Checkbutton(window, text=sample, variable=sample_ticked[-1], command=set_sample_to_plot)
         r.select()
         r.place(x=460+c, y= 203+l)
         c+=100
@@ -108,26 +117,36 @@ def display_sample_list(raw_data, col, first_sample, nb_sample):
             c=0
             l+=30
 
+    for int in sample_ticked:
+        int.set(1)
+    set_sample_to_plot()
+
 def get_week_list(raw_data, col, first_sample):
+    global week_list
+    global week_lines
+    global week_to_plot
     week_list = []
     week_lines = {}
+    week_to_plot = {}
     i=0
 
     first_sample = ''.join(i for i in first_sample if not i.isdigit())
     
     s_list = raw_data.iloc[0:, col:(col+1)]
-    for sample in s_list[col]:
-        if isinstance(sample, str):
-            if sample[0] == first_sample:
-                s = list(sample)
+    for week in s_list[col]:
+        if isinstance(week, str):
+            if week[0] == first_sample:
+                s = list(week)
                 s[0] = "T"
-                week_list.append(''.join(s))
-                week_lines[sample] = i
+                st = ''.join(s)
+                week_list.append(st)
+                week_to_plot[st] = 0
+                week_lines[st] = i
         i+=1
 
-    return week_list, week_lines
-
 def display_week_list(raw_data, col, first_sample):
+    global week_ticked
+    week_ticked = []
     l=0
     c=0
     tk.Label(window, text = "Semaines").place(x = 700, y = 280)
@@ -135,163 +154,140 @@ def display_week_list(raw_data, col, first_sample):
     if isinstance(col, str):
         col = ord(col) - ord("A")
 
-    week_list, week_lines = get_week_list(raw_data, col, first_sample)
+    get_week_list(raw_data, col, first_sample)
     
-    for sample in week_list:
-        r = tk.Checkbutton(window, text=sample, onvalue=1, offvalue=0)
+    for week in week_list:
+        week_ticked.append(tk.IntVar())
+        r = tk.Checkbutton(window, text=week, variable=week_ticked[-1], command=set_week_to_plot)
         r.place(x=460+c, y= 303+l)
         c+=100
         if(c == 600):
             c=0
             l+=30
 
-
-# Gives week start line in excel file from user input parameter
-def get_week_line(param):
-    return Week_start_line[param]
-
-# Reads user input parameter units in file
-def get_row_unit(data_param):
-    week = data_param.iloc[7:8].values[0]
-    return week[0]
-
-# Extract data from a specified week
-def extract_week(data_param, week):
-    line = get_week_line(week)
+def extract_week_data(data_param, week):
+    line = week_lines[week]
 
     week = data_param.iloc[line:line+12]
     week = week.rename(index={line: "A",line+1: "B",line+2: "C",line+3: "D",line+4: "E",line+5: "F",line+6: "G",line+7: "H",line+8: "I",line+9: "J",line+10: "K",line+11: "L"})
     return week.to_dict()
 
-def plot_view(data, param, view_type, unit, plot_id):
+def plot_view(data, param, plot_id):
     abscisse = []
-    full_vals = {}
-    ech_vals = []
+    sample_values = {}
+    tmp_values = []
 
     plt.figure(plot_id)
 
-    for key, value in data.items():
-        abscisse.append(key) # Getting T0, T1, T1+1 etc...
+    for week, has_to_be_plotted in week_to_plot.items():
+        if has_to_be_plotted == 1:
+            abscisse.append(week)
 
-    for ech in sample_list:
-        for key, value in data.items():
-            ech_vals.append(value[param][ech]) # Getting A value for T0, then B value for T0, etc...
+    for sample, has_to_be_plotted in sample_to_plot.items():
+        if has_to_be_plotted == 1:
+            for week, sample_measures in data.items():
+                tmp_values.append(sample_measures[param][sample])
         
-        full_vals[ech] = ech_vals.copy()
-        ech_vals.clear()
-        
-    for ech in range(len(sample_list)):
-        plt.plot(abscisse, full_vals[sample_list[ech]], label=sample_list[ech])
+            sample_values[sample] = tmp_values.copy()
+            tmp_values.clear()
 
-    if view_type == "T1+9":
-        plt.title("Evolution du "+param+" après 1 mois")
-    elif view_type == "T3+9":
-        plt.title("Evolution du "+param+" après 3 mois")
-    elif view_type == "T6+9":
-        plt.title("Evolution du "+param+" après 6 mois")
-    elif view_type == "T0T8":
-        plt.title("Evolution du "+param+" sur les "+str(len(Total_month_list)-1)+" mois")
+    i = 0
+
+    for sample, has_to_be_plotted in sample_to_plot.items():
+        if has_to_be_plotted == 1:
+            plt.plot(abscisse, sample_values[sample], label=sample, color=color_list[i], linewidth=2)
+        i+=1
+    
+    plt.title("Evolution du "+param+" de "+abscisse[0]+" à "+abscisse[len(abscisse)-1])
     
     plt.legend(loc='upper right')
     plt.xlabel("Temps (mois)")
-    plt.ylabel(unit)
-    plt.show()
+    plt.ylabel(param_unit[param])
 
-def charger_fichier():
+def load_file():
     global raw_data
     filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
-    e1.insert(tk.END, filename)
-    raw_data = pd.read_excel(filename,index_col=None, header=None)
-    display_param(raw_data, int(e2.get()))
-    display_sample_list(raw_data, e3.get(), e4.get(), int(e5.get()))
-    display_week_list(raw_data, e3.get(), e4.get())
+    entry_path.insert(tk.END, filename)
+    raw_data = pd.read_excel(filename, index_col=None, header=None)
+    display_param(raw_data, int(entry_param.get()))
+    display_sample_list(raw_data, entry_sample_col.get(), entry_sample_1.get(), int(entry_sample_nb.get()))
+    display_week_list(raw_data, entry_sample_col.get(), entry_sample_1.get())
 
-def get_user_choice():
-    global i
-    path = e1.get()
-    param = e2.get()
-    view_type = e3.get()
-    i+=1
-    compute(path, param, view_type, i)
+def go_graph():
+    plot_id=0
 
-def get_user_choice_from_event(event):
-    get_user_choice()
+    for param, has_to_be_plotted in param_to_plot.items():
+        if has_to_be_plotted == 1:
+            collect_data(param, plot_id)
+            plot_id+=1
 
-def compute(path, param, view_type, plot_id):
-    # Read excel file
-    # raw_data = pd.read_excel(path, sheet_name="Données",index_col=None, header=None)
+    plt.show()
 
-    # get_param_list(raw_data, 7)
+def go_from_keyboard_event(event):
+    go_graph()
 
-    # Getting column num for user input parameter
-    row = get_param_row(raw_data, param)
-
+def collect_data(param, plot_id):
     # Reducing excel sheet to only parameter's data
-    data_param = raw_data.iloc[0:, row:(row+1)]
+    data_param = raw_data.iloc[0:, param_col[param]:(param_col[param]+1)]
 
     # Renaming serie with friendly param name
-    data_param = data_param.rename(columns={row: param})
+    data_param = data_param.rename(columns={param_col[param]: param})
 
-    # Getting unit
-    unit = get_row_unit(data_param)
-
-    # Getting weeks list needed
-    week_list = get_weeks_to_plot(view_type)
-
-    # Getting each week in a dictionary
+    # Getting each week param values in a dictionary
     data = {}
-    for week in week_list:
-        data[week] = extract_week(data_param, week)
+    for week, has_to_be_plotted in week_to_plot.items():
+        if has_to_be_plotted == 1:
+            data[week] = extract_week_data(data_param, week)
 
     # Affichage du graphe
-    plot_view(data, param, view_type, unit, plot_id)
+    plot_view(data, param, plot_id)
 
 if __name__ == '__main__':
     global window
     window = tk.Tk()
-    window.title("Excel2graph")
+    window.title("Excetext_paramgraph")
     window.iconbitmap("./icon.ico")
     window.geometry("1100x700")
     window.resizable(0, 0)
 
-    l1 = tk.Label(window, text = "Fichier excel")
-    l1.place(x = 20, y = 23)
-    e1 = tk.Entry(window, bd = 3, width=15)
-    e1.place(x = 140, y = 20)
-    b1=tk.Button(window, text = "Chercher...", command=charger_fichier, width=10)
-    b1.place(x = 300, y = 20)
+    text_path = tk.Label(window, text = "Fichier excel")
+    text_path.place(x = 20, y = 23)
+    entry_path = tk.Entry(window, bd = 3, width=15)
+    entry_path.place(x = 140, y = 20)
+    button_path=tk.Button(window, text = "Chercher...", command=load_file, width=10)
+    button_path.place(x = 300, y = 20)
 
-    l2 = tk.Label(window, text = "Ligne des paramètres")
-    l2.place(x = 20, y = 63)
-    e2 = tk.Entry(window, bd = 3, width=2)
-    e2.insert(tk.END, "7")
-    e2.place(x = 255, y = 60)
+    text_param = tk.Label(window, text = "Ligne des paramètres")
+    text_param.place(x = 20, y = 63)
+    entry_param = tk.Entry(window, bd = 3, width=2)
+    entry_param.insert(tk.END, "7")
+    entry_param.place(x = 255, y = 60)
 
-    l3 = tk.Label(window, text = "Colonne des échantillons")
-    l3.place(x = 20, y = 103)
-    e3 = tk.Entry(window, bd = 3, width=2)
-    e3.insert(tk.END, "C")
-    e3.place(x = 255, y = 100)
+    text_sample_col = tk.Label(window, text = "Colonne des échantillons")
+    text_sample_col.place(x = 20, y = 103)
+    entry_sample_col = tk.Entry(window, bd = 3, width=2)
+    entry_sample_col.insert(tk.END, "C")
+    entry_sample_col.place(x = 255, y = 100)
 
-    l4 = tk.Label(window, text = "Premier échantillon")
-    l4.place(x = 20, y = 143)
-    e4 = tk.Entry(window, bd = 3, width=2)
-    e4.insert(tk.END, "A0")
-    e4.place(x = 255, y = 140)
+    text_sample_1 = tk.Label(window, text = "Premier échantillon")
+    text_sample_1.place(x = 20, y = 143)
+    entry_sample_1 = tk.Entry(window, bd = 3, width=2)
+    entry_sample_1.insert(tk.END, "A0")
+    entry_sample_1.place(x = 255, y = 140)
 
-    l5 = tk.Label(window, text = "Nombre d'échantillons")
-    l5.place(x = 20, y = 183)
-    e5 = tk.Entry(window, bd = 3, width=2)
-    e5.insert(tk.END, "12")
-    e5.place(x = 255, y = 180)
+    text_sample_nb = tk.Label(window, text = "Nombre d'échantillons")
+    text_sample_nb.place(x = 20, y = 183)
+    entry_sample_nb = tk.Entry(window, bd = 3, width=2)
+    entry_sample_nb.insert(tk.END, "12")
+    entry_sample_nb.place(x = 255, y = 180)
 
-    btn = tk.Button(window, text = "Go !", command=get_user_choice, width=20)
-    btn.place(x = 700, y = 660)
+    btn_go = tk.Button(window, text = "Go !", command=go_graph, width=20)
+    btn_go.place(x = 700, y = 660)
 
-    l4 = tk.Label(window, text = "Version 2021.11.11")
-    l4.place(x = 20, y = 670)
+    text_version = tk.Label(window, text = "Version 2021.11.12")
+    text_version.place(x = 20, y = 670)
 
-    window.bind('<Return>', get_user_choice_from_event)
+    window.bind('<Return>', go_from_keyboard_event)
     
     window.mainloop()
 
