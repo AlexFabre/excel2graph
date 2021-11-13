@@ -3,6 +3,7 @@
 
 # ------------------ Librairies ------------------
 import sys
+import math
 from matplotlib import colors
 import pandas as pd
 import openpyxl
@@ -205,21 +206,25 @@ def plot_view(data, param, plot_id):
     abscisse = []
     sample_values = {}
     tmp_values = []
+    weeks_effectively_plotted = []
 
     plt.figure(plot_id)
     ax = plt.subplot(111)
 
-    for week, has_to_be_plotted in week_to_plot.items():
-        if has_to_be_plotted == 1:
-            abscisse.append(week)
-
     for sample, has_to_be_plotted in sample_to_plot.items():
         if has_to_be_plotted == 1:
             for week, sample_measures in data.items():
-                tmp_values.append(sample_measures[param][sample])
+                if math.isnan(sample_measures[param][sample]) == False:
+                    weeks_effectively_plotted.append(week)
+                    tmp_values.append(sample_measures[param][sample])
         
             sample_values[sample] = tmp_values.copy()
             tmp_values.clear()
+
+    for week, has_to_be_plotted in week_to_plot.items():
+        if has_to_be_plotted == 1 and week in weeks_effectively_plotted:
+            abscisse.append(week)
+
 
     i = 0
 
