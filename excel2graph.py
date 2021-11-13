@@ -17,6 +17,8 @@ if sys.stderr.encoding != 'UTF-8':
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 # ------------------ Definitions ------------------
+setting_view_opened = False
+param_view_opened = False
 
 color_list = ["firebrick","salmon","orange","burlywood","olive","yellowgreen","lightgreen","turquoise","lightskyblue","royalblue","mediumorchid","hotpink"]
 
@@ -84,12 +86,12 @@ def display_param(raw_data, line):
     param_ticked = []
     l = 0
     c = 0
-    tk.Label(window, text = "Paramètres").place(x = 700, y = 20)
+    tk.Label(window, text = "Paramètres").place(x = 460, y = 20)
     get_param_list(raw_data, line)
     for param in param_list:
         param_ticked.append(tk.IntVar())
         r = tk.Checkbutton(window, text=param, variable=param_ticked[-1], command=set_param_to_plot)
-        r.place(x=460+c, y= 63+l)
+        r.place(x=460+c, y= 53+l)
         c+=100
         if(c == 600):
             c=0
@@ -127,7 +129,7 @@ def display_sample_list(raw_data, col, first_sample, nb_sample):
     sample_ticked = []
     l=0
     c=0
-    tk.Label(window, text = "Echantillons").place(x = 700, y = 180)
+    tk.Label(window, text = "Echantillons").place(x = 460, y = 190)
 
     if isinstance(col, str):
         col = ord(col) - ord("A")
@@ -138,7 +140,7 @@ def display_sample_list(raw_data, col, first_sample, nb_sample):
         sample_ticked.append(tk.IntVar())
         r = tk.Checkbutton(window, text=sample, variable=sample_ticked[-1], command=set_sample_to_plot)
         r.select()
-        r.place(x=460+c, y= 203+l)
+        r.place(x=460+c, y= 223+l)
         c+=100
         if(c == 600):
             c=0
@@ -176,7 +178,7 @@ def display_week_list(raw_data, col, first_sample):
     week_ticked = []
     l=0
     c=0
-    tk.Label(window, text = "Semaines").place(x = 700, y = 280)
+    tk.Label(window, text = "Semaines").place(x = 460, y = 310)
 
     if isinstance(col, str):
         col = ord(col) - ord("A")
@@ -186,7 +188,7 @@ def display_week_list(raw_data, col, first_sample):
     for week in week_list:
         week_ticked.append(tk.IntVar())
         r = tk.Checkbutton(window, text=week, variable=week_ticked[-1], command=set_week_to_plot)
-        r.place(x=460+c, y= 303+l)
+        r.place(x=460+c, y= 343+l)
         c+=100
         if(c == 600):
             c=0
@@ -230,7 +232,7 @@ def plot_view(data, param, plot_id):
     
     # Shrink current axis's height by 10% on the bottom
     box = ax.get_position()
-    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width * 0.9, box.height * 0.9])
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width * 0.95, box.height * 0.9])
 
     plt.legend(bbox_to_anchor=(1,1), loc="upper left")
     plt.xlabel("Temps (mois)")
@@ -239,6 +241,11 @@ def plot_view(data, param, plot_id):
 
 def load_file():
     global raw_data
+    global param_view_opened
+    global warn_missing_param
+    global warn_missing_sample
+    global warn_missing_week
+
     filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
     entry_path.insert(tk.END, filename)
     raw_data = pd.read_excel(filename, index_col=None, header=None)
@@ -248,6 +255,13 @@ def load_file():
     display_week_list(raw_data, entry_sample_col.get(), entry_sample_1.get())
     
     window.geometry("1100x700")
+    param_view_opened = True
+    text_version.place(x = 20, y = 670)
+    btn_go.place(x = 700, y = 660)
+    warn_missing_param = tk.Label(window, fg='Red', text = "Selectionez au moins 1 paramètre")
+    warn_missing_sample = tk.Label(window, fg='Red', text = "Selectionez au moins 1 échantillon")
+    warn_missing_week = tk.Label(window, fg='Red', text = "Selectionez au moins 2 semaines")
+        
 
     btn_1mois = tk.Button(window, text = "Après 1 mois", command=tick_month_1, width=10)
     btn_1mois.place(x = 300, y = 310)
@@ -261,8 +275,57 @@ def load_file():
     btn_6mois = tk.Button(window, text = "Chaque mois", command=tick_every_month, width=10)
     btn_6mois.place(x = 300, y = 430)
 
+def enough_check_boxes():
+    global enough_param
+    global enough_sample
+    global enough_week
+
+    enough_param = False
+    enough_sample = False
+    nb_week = 0
+    enough_week = False
+    
+    for param, has_to_be_plotted in param_to_plot.items():
+        if has_to_be_plotted == 1:
+            enough_param = True
+
+    for sample, has_to_be_plotted in sample_to_plot.items():
+        if has_to_be_plotted == 1:
+            enough_sample = True
+
+    for week, has_to_be_plotted in week_to_plot.items():
+        if has_to_be_plotted == 1:
+            nb_week += 1
+            if nb_week >= 2:
+                enough_week = True
+                break
+
+    if not enough_param:
+        warn_missing_param.place(x = 650, y = 20)
+    else:
+        warn_missing_param.place_forget()
+    
+    if not enough_sample:
+        warn_missing_sample.place(x = 650, y = 190)
+    else:
+        warn_missing_sample.place_forget()
+    
+    if not enough_week:
+        warn_missing_week.place(x = 650, y = 310)
+    else:
+        warn_missing_week.place_forget()
+        
+    if not enough_param or not enough_sample or not enough_week:
+        return False
+    
+    return True
+
+
 def go_graph():
     plot_id=0
+
+    if not enough_check_boxes():
+        return
 
     for param, has_to_be_plotted in param_to_plot.items():
         if has_to_be_plotted == 1:
@@ -290,11 +353,45 @@ def collect_data(param, plot_id):
     # Affichage du graphe
     plot_view(data, param, plot_id)
 
+def settings_view():
+    global setting_view_opened
+
+    if setting_view_opened == False:
+        if param_view_opened == False:
+            window.geometry("450x290")
+            text_version.place(x = 20, y = 260)
+
+        button_setting.config(text="Réglages avancés -")   
+        text_param.place(x = 20, y = 103)
+        entry_param.place(x = 255, y = 100)
+        text_sample_col.place(x = 20, y = 143)
+        entry_sample_col.place(x = 255, y = 140)
+        text_sample_1.place(x = 20, y = 183)
+        entry_sample_1.place(x = 255, y = 180)
+        text_sample_nb.place(x = 20, y = 223)
+        entry_sample_nb.place(x = 255, y = 220)
+        setting_view_opened = True
+    else:
+        if param_view_opened == False:
+            window.geometry("450x110")
+            text_version.place_forget()
+
+        button_setting.config(text="Réglages avancés +")
+        text_param.place_forget()
+        entry_param.place_forget()
+        text_sample_col.place_forget()
+        entry_sample_col.place_forget()
+        text_sample_1.place_forget()
+        entry_sample_1.place_forget()
+        text_sample_nb.place_forget()
+        entry_sample_nb.place_forget()
+        setting_view_opened = False
+
 if __name__ == '__main__':
     global window
     window = tk.Tk()
     window.title("excel2graph")
-    window.geometry("450x270")
+    window.geometry("450x110")
     window.resizable(0, 0)
 
     text_path = tk.Label(window, text = "Fichier excel")
@@ -304,38 +401,28 @@ if __name__ == '__main__':
     button_path=tk.Button(window, text = "Chercher...", command=load_file, width=10)
     button_path.place(x = 300, y = 20)
 
-    text_advanced_param = tk.Label(window, text = "Réglages avancés:")
-    text_advanced_param.place(x = 20, y = 63)
+    button_setting=tk.Button(window, text = "Réglages avancés +", command=settings_view, width=15)
+    button_setting.place(x = 20, y = 63)
 
     text_param = tk.Label(window, text = "Ligne des paramètres")
-    text_param.place(x = 20, y = 103)
     entry_param = tk.Entry(window, bd = 3, width=2)
     entry_param.insert(tk.END, "7")
-    entry_param.place(x = 255, y = 100)
 
     text_sample_col = tk.Label(window, text = "Colonne des échantillons")
-    text_sample_col.place(x = 20, y = 143)
     entry_sample_col = tk.Entry(window, bd = 3, width=2)
     entry_sample_col.insert(tk.END, "C")
-    entry_sample_col.place(x = 255, y = 140)
 
     text_sample_1 = tk.Label(window, text = "Premier échantillon")
-    text_sample_1.place(x = 20, y = 183)
     entry_sample_1 = tk.Entry(window, bd = 3, width=2)
     entry_sample_1.insert(tk.END, "A0")
-    entry_sample_1.place(x = 255, y = 180)
 
     text_sample_nb = tk.Label(window, text = "Nombre d'échantillons")
-    text_sample_nb.place(x = 20, y = 223)
     entry_sample_nb = tk.Entry(window, bd = 3, width=2)
     entry_sample_nb.insert(tk.END, "12")
-    entry_sample_nb.place(x = 255, y = 220)
 
     btn_go = tk.Button(window, text = "Go !", command=go_graph, width=20)
-    btn_go.place(x = 700, y = 660)
 
-    text_version = tk.Label(window, text = "Version 2021.11.12")
-    text_version.place(x = 20, y = 670)
+    text_version = tk.Label(window, text = "Version 2021.11.13")
 
     window.bind('<Return>', go_from_keyboard_event)
     
