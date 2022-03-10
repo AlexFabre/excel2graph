@@ -389,8 +389,6 @@ if __name__ == '__main__':
     window.title("Excel2graph")
     if "nt" == os.name:
         window.iconbitmap('./icv.ico')
-    else:
-        window.iconbitmap('@icv.xbm')
     window.geometry("430x100")
     window.resizable(0, 0)
 
