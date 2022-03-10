@@ -3,10 +3,10 @@
 
 # ------------------ Librairies ------------------
 import sys
-import math
-from matplotlib import colors
+import os
 import pandas as pd
-import openpyxl
+import numpy as np
+import openpyxl as px
 import matplotlib.pyplot as plt
 import tkinter as tk
 import tkinter.filedialog as fd
@@ -17,419 +17,395 @@ if sys.stdout.encoding != 'UTF-8':
 if sys.stderr.encoding != 'UTF-8':
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
-# ------------------ Definitions ------------------
-setting_view_opened = False
-param_view_opened = False
-
-color_list = ["firebrick","salmon","orange","burlywood","olive","yellowgreen","lightgreen","turquoise","lightskyblue","royalblue","mediumorchid","hotpink"]
+color_list = ["brown","royalblue","orchid","aqua","red","steelblue","lime","orange","darkseagreen","pink","gold","darkgreen","rosybrown",]
 
 # ------------------ Fonctions ------------------
 
-def tick_month_1():
-    tick_month("1")
+# Gives the week list to plot from user input weeks
+def get_weeks_to_plot():
+    weeks_to_display = []
 
-def tick_month_3():
-    tick_month("3")
-
-def tick_month_6():
-    tick_month("6")
-
-def tick_month(n):
-    for i, int in enumerate(week_ticked):
-        if (week_list[i][1] == "0" or week_list[i][1] == n):
-            int.set(1)
-        else:
-            int.set(0)
-    set_week_to_plot()
-
-def tick_every_month():
-    for i, int in enumerate(week_ticked):
-        if "+" in week_list[i]:
-            int.set(0)
-        else:
-            int.set(1)
-    set_week_to_plot()
-
-def set_param_to_plot():
-    for i, int in enumerate(param_ticked):
-        param_to_plot[param_list[i]] = int.get()
-
-def set_sample_to_plot():
-    for i, int in enumerate(sample_ticked):
-        sample_to_plot[sample_list[i]] = int.get()
-
-def set_week_to_plot():
-    for i, int in enumerate(week_ticked):
-        week_to_plot[week_list[i]] = int.get()
-
-def get_param_list(raw_data, line):
-    global param_list
-    global param_to_plot
-    global param_col
-    global param_unit
-    param_list = []
-    param_to_plot = {}
-    param_col = {}
-    param_unit = {}
-    i=0
-
-    p_list = raw_data.iloc[line-1:line+1]
-    for parameter in p_list.values[0]:
-        if isinstance(parameter, str):
-            param_list.append(parameter)
-            param_col[parameter] = i
-            param_unit[parameter] = p_list.values[1][i]
-            param_to_plot[parameter] = 0
-        i+=1
-
-def display_param(raw_data, line):
-    global param_ticked
-    param_ticked = []
-    l = 0
-    c = 0
-    tk.Label(window, text = "Paramètres").place(x = 460, y = 20)
-    get_param_list(raw_data, line)
-    for param in param_list:
-        param_ticked.append(tk.IntVar())
-        r = tk.Checkbutton(window, text=param, variable=param_ticked[-1], command=set_param_to_plot)
-        r.place(x=460+c, y= 53+l)
-        c+=100
-        if(c == 600):
-            c=0
-            l+=30
-
-def get_sample_list(raw_data, col, first_sample, nb_sample):
-    global sample_list
-    global sample_to_plot
-    sample_list = []
-    sample_to_plot = {}
-    first_sample_found = False
-    n=0
+    for i in range(len(week_list)):
+        if weeks_check_button[i].get() == 1:
+            weeks_to_display.append(week_list[i])
     
-    s_list = raw_data.iloc[0:, col:(col+1)]
-    for s in s_list[col]:
-        if first_sample_found == True:
-            sample = ''.join(i for i in s if not i.isdigit())
-            sample_list.append(sample)
-            sample_to_plot[sample] = 0
-            n+=1
-            if n == nb_sample:
-                break
-            continue
-        if isinstance(s, str):
-            if s == first_sample:
-                sample = ''.join(i for i in s if not i.isdigit())
-                sample_list.append(sample)
-                sample_to_plot[sample] = 0
-                first_sample_found = True
-                n+=1
+    return weeks_to_display
 
+def errorfill(x, y, yerr, color=None, alpha_fill=0.2, ax=None):
+    ax = ax if ax is not None else plt.gca()
+    if color is None:
+        color = ax._get_lines.color_cycle.next()
+    if np.isscalar(yerr) or len(yerr) == len(y):
+        ymin = np.array(y) - np.array(yerr)
+        ymax = np.array(y) + np.array(yerr)
+    elif len(yerr) == 2:
+        ymin, ymax = yerr
+    ax.plot(x, y, color=color)
+    ax.fill_between(x, ymax, ymin, color=color, alpha=alpha_fill)
 
-def display_sample_list(raw_data, col, first_sample, nb_sample):
-    global sample_ticked
-    sample_ticked = []
-    l=0
-    c=0
-    tk.Label(window, text = "Echantillons").place(x = 460, y = 190)
+# Gives row number in excel file from user input parameter
+def get_param_row(parameter):
+    p_list = raw_data.iloc[6:7].values[0]
+    row = 0
+    for p in p_list:
+        if p == parameter:
+            return row
+        row+=1
 
-    if isinstance(col, str):
-        col = ord(col) - ord("A")
+# Gives week start line in excel file from user input parameter
+def get_week_start_line(week):
+    return week_start_line[week]
 
-    get_sample_list(raw_data, col, first_sample, nb_sample)
-    
-    for sample in sample_list:
-        sample_ticked.append(tk.IntVar())
-        r = tk.Checkbutton(window, text=sample, variable=sample_ticked[-1], command=set_sample_to_plot)
-        r.select()
-        r.place(x=460+c, y= 223+l)
-        c+=100
-        if(c == 600):
-            c=0
-            l+=30
+# Reads user input parameter units in file
+def get_param_unit(param_data):
+    unit_cell = param_data.iloc[7:8].values[0]
+    if isinstance(unit_cell[0], str) == False:
+        return "Sans unité"
+    return unit_cell[0]
 
-    for int in sample_ticked:
-        int.set(1)
-    set_sample_to_plot()
+# Extract data from a specified week
+def extract_week(param_data, week):
+    line = get_week_start_line(week)
 
-def get_week_list(raw_data, col, first_sample):
-    global week_list
-    global week_lines
-    global week_to_plot
-    week_list = []
-    week_lines = {}
-    week_to_plot = {}
-    i=0
+    week = param_data.iloc[line:line+len(sample_list)]
+    for i in range(len(sample_list)):
+        week = week.rename(index={line+i:sample_list[i]})
 
-    first_sample = ''.join(i for i in first_sample if not i.isdigit())
-    
-    s_list = raw_data.iloc[0:, col:(col+1)]
-    for week in s_list[col]:
-        if isinstance(week, str):
-            if week[0] == first_sample:
-                s = list(week)
-                s[0] = "T"
-                st = ''.join(s)
-                week_list.append(st)
-                week_to_plot[st] = 0
-                week_lines[st] = i
-        i+=1
-
-def display_week_list(raw_data, col, first_sample):
-    global week_ticked
-    week_ticked = []
-    l=0
-    c=0
-    tk.Label(window, text = "Semaines").place(x = 460, y = 310)
-
-    if isinstance(col, str):
-        col = ord(col) - ord("A")
-
-    get_week_list(raw_data, col, first_sample)
-    
-    for week in week_list:
-        week_ticked.append(tk.IntVar())
-        r = tk.Checkbutton(window, text=week, variable=week_ticked[-1], command=set_week_to_plot)
-        r.place(x=460+c, y= 343+l)
-        c+=100
-        if(c == 600):
-            c=0
-            l+=30
-
-def extract_week_data(data_param, week):
-    line = week_lines[week]
-
-    week = data_param.iloc[line:line+12]
-    week = week.rename(index={line: "A",line+1: "B",line+2: "C",line+3: "D",line+4: "E",line+5: "F",line+6: "G",line+7: "H",line+8: "I",line+9: "J",line+10: "K",line+11: "L"})
+    # week = week.rename(index={line: "A",line+1: "B",line+2: "C",line+3: "D",line+4: "E",line+5: "F",line+6: "G",line+7: "H",line+8: "I",line+9: "J",line+10: "K",line+11: "L"})
     return week.to_dict()
 
-def plot_view(data, param, plot_id):
-    abscisse = []
-    sample_values = {}
-    tmp_values = []
-    weeks_effectively_plotted = []
+def plot_view(data, error, param, displayed_week_list, unit):
+    x_legend = []
+    displayed_values = {}
+    displayed_errors = {}
+    sample_values = []
+    error_values = []
 
-    plt.figure(plot_id)
-    ax = plt.subplot(111)
+    Title = param+" "+displayed_week_list[0]+" - "+displayed_week_list[len(displayed_week_list)-1]
 
-    for sample, has_to_be_plotted in sample_to_plot.items():
-        if has_to_be_plotted == 1:
-            for week, sample_measures in data.items():
-                if math.isnan(sample_measures[param][sample]) == False:
-                    weeks_effectively_plotted.append(week)
-                    tmp_values.append(sample_measures[param][sample])
+    plt.figure(Title)
+
+    for key, value in data.items():
+        x_legend.append(week_days_from_start[key]) # Getting T0, T1, T1+1 etc...
+
+    for i in range(len(sample_list)):
+        if sample_check_button[i].get() == 1:
+            for key, value in data.items():
+                if (isinstance(value[param][sample_list[i]], float) == False) and (isinstance(value[param][sample_list[i]], int) == False):
+                    try:
+                        sample_values.append(float(value[param][sample_list[i]][1:]))
+                    except ValueError:
+                        sample_values.append(value[param][sample_list[i]])
+                else:
+                    sample_values.append(value[param][sample_list[i]]) # Getting A value for T0, then B value for T0, etc...
+            for key, value in error.items():
+                try:
+                    error_values.append(value["Error_"+param][sample_list[i]]/2) # Getting A error value for T0, then B error value for T0, etc...
+                except TypeError:
+                    error_values.append(value["Error_"+param][sample_list[i]])
+            
+            displayed_values[sample_list[i]] = sample_values.copy()
+            displayed_errors[sample_list[i]] = error_values.copy()
+            sample_values.clear()
+            error_values.clear()
         
-            sample_values[sample] = tmp_values.copy()
-            tmp_values.clear()
+    for i in range(len(sample_list)):
+        if sample_check_button[i].get() == 1:
+            plt.plot(x_legend, displayed_values[sample_list[i]], label=sample_list[i], color=color_list[i])
+            if error_visibility.get() == 1 and param_has_error_data and (isinstance(displayed_values[sample_list[i]][0], str)==False) and (isinstance(displayed_errors[sample_list[i]][0], int) or isinstance(displayed_errors[sample_list[i]][0], float)):
+                errorfill(x_legend, displayed_values[sample_list[i]],  displayed_errors[sample_list[i]], color_list[i], alpha_error_value)
 
-    for week, has_to_be_plotted in week_to_plot.items():
-        if has_to_be_plotted == 1 and week in weeks_effectively_plotted:
-            abscisse.append(week)
+    plt.title("Evolution du "+param+" de "+displayed_week_list[0]+" à "+displayed_week_list[len(displayed_week_list)-1])
+    if grid_visibility.get() == 1:
+        plt.grid(visible=True, which='major', color='#888888', linestyle='-', alpha=0.5)
+        plt.minorticks_on()
+        plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
+    plt.legend(loc='upper right', bbox_to_anchor=(1.1, 1.0))
+    plt.xlabel("Temps (jours)")
+    plt.ylabel(unit)
 
-    i = 0
+def compute(param):
+    global param_has_error_data
+    param_has_error_data = False
 
-    for sample, has_to_be_plotted in sample_to_plot.items():
-        if has_to_be_plotted == 1:
-            ax.plot(abscisse, sample_values[sample], label=sample, color=color_list[i], linewidth=2)
-        i+=1
+    # Getting column num for user input parameter
+    row = get_param_row(param)
+
+    # Reducing excel sheet to only parameter's data
+    param_data = raw_data.iloc[0:, row:(row+1)]
+    param_data_error = raw_data.iloc[0:, (row+1):(row+2)]
+
+    # Renaming serie with friendly param name
+    # param_data = param_data.rename(columns={row: param})
+    # param_data_error = param_data_error.rename(columns={row: "error_"+param})
+    param_data.columns = [param]
     
-    plt.title("Evolution du "+param+" de "+abscisse[0]+" à "+abscisse[len(abscisse)-1])
+    if not param_data_error.empty:
+     # insert code here
+        param_has_error_data = True
+        param_data_error.columns = ["Error_"+param]
     
-    # Shrink current axis's height by 10% on the bottom
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width * 0.95, box.height * 0.9])
 
-    plt.legend(bbox_to_anchor=(1,1), loc="upper left")
-    plt.xlabel("Temps (mois)")
-    plt.xticks(rotation=70)
-    plt.ylabel(param_unit[param])
+    # Getting unit
+    unit = get_param_unit(param_data)
 
-def load_file():
-    global raw_data
-    global param_view_opened
-    global warn_missing_param
-    global warn_missing_sample
-    global warn_missing_week
+    # Getting weeks list needed
+    displayed_week_list = get_weeks_to_plot()
 
-    filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
-    entry_path.insert(tk.END, filename)
-    raw_data = pd.read_excel(filename, index_col=None, header=None)
+    # Getting each week in a dictionary
+    data = {}
+    error = {}
+    for week in displayed_week_list:
+        data[week] = extract_week(param_data, week)
+        if param_has_error_data:
+            error[week] = extract_week(param_data_error, week)
 
-    display_param(raw_data, int(entry_param.get()))
-    display_sample_list(raw_data, entry_sample_col.get(), entry_sample_1.get(), int(entry_sample_nb.get()))
-    display_week_list(raw_data, entry_sample_col.get(), entry_sample_1.get())
+    # Affichage du graphe
+    plot_view(data, error, param, displayed_week_list, unit)
+
+
+# ------------------ Affichage ------------------
+
+def browsefunc():
+        filename = fd.askopenfilename(filetypes=(("xlsx files","*.xlsx"),("All files","*.*")))
+        e1.insert(tk.END, filename)
+
+def compute_data_from_event(event):
+    compute_data()
+
+def compute_data():
+    # Traite la valuer de transparence de la barre d'erreur
+    global alpha_error_value
+    alpha_error_value = e_alpha_error.get()
+    try: 
+        alpha_error_value=int(alpha_error_value)/100
+    except ValueError:
+        alpha_error_value = 0.2
+    if alpha_error_value < 0.0 or alpha_error_value > 1.0:
+        alpha_error_value = 0.2
+
+    # Vérifie qu'il y a bien au moins 1 echantillon de selectioné
+    selected_samples = []
+    for i in range(len(sample_list)):
+        if sample_check_button[i].get() == 1:
+            selected_samples.append(sample_list[i])
     
-    window.geometry("1100x700")
-    param_view_opened = True
-    text_version.place(x = 20, y = 670)
-    btn_go.place(x = 700, y = 660)
-    warn_missing_param = tk.Label(window, fg='Red', text = "Selectionez au moins 1 paramètre")
-    warn_missing_sample = tk.Label(window, fg='Red', text = "Selectionez au moins 1 échantillon")
-    warn_missing_week = tk.Label(window, fg='Red', text = "Selectionez au moins 2 semaines")
-        
-
-    btn_1mois = tk.Button(window, text = "Après 1 mois", command=tick_month_1, width=10)
-    btn_1mois.place(x = 300, y = 310)
-
-    btn_3mois = tk.Button(window, text = "Après 3 mois", command=tick_month_3, width=10)
-    btn_3mois.place(x = 300, y = 350)
-
-    btn_6mois = tk.Button(window, text = "Après 6 mois", command=tick_month_6, width=10)
-    btn_6mois.place(x = 300, y = 390)
-
-    btn_6mois = tk.Button(window, text = "Chaque mois", command=tick_every_month, width=10)
-    btn_6mois.place(x = 300, y = 430)
-
-def enough_check_boxes():
-    global enough_param
-    global enough_sample
-    global enough_week
-
-    enough_param = False
-    enough_sample = False
-    nb_week = 0
-    enough_week = False
-    
-    for param, has_to_be_plotted in param_to_plot.items():
-        if has_to_be_plotted == 1:
-            enough_param = True
-
-    for sample, has_to_be_plotted in sample_to_plot.items():
-        if has_to_be_plotted == 1:
-            enough_sample = True
-
-    for week, has_to_be_plotted in week_to_plot.items():
-        if has_to_be_plotted == 1:
-            nb_week += 1
-            if nb_week >= 2:
-                enough_week = True
-                break
-
-    if not enough_param:
-        warn_missing_param.place(x = 650, y = 20)
-    else:
-        warn_missing_param.place_forget()
-    
-    if not enough_sample:
-        warn_missing_sample.place(x = 650, y = 190)
-    else:
-        warn_missing_sample.place_forget()
-    
-    if not enough_week:
-        warn_missing_week.place(x = 650, y = 310)
-    else:
-        warn_missing_week.place_forget()
-        
-    if not enough_param or not enough_sample or not enough_week:
-        return False
-    
-    return True
-
-
-def go_graph():
-    plot_id=0
-
-    if not enough_check_boxes():
+    if len(selected_samples) < 1:
         return
 
-    for param, has_to_be_plotted in param_to_plot.items():
-        if has_to_be_plotted == 1:
-            collect_data(param, plot_id)
-            plot_id+=1
+
+    # Vérifie qu'il y a bien au moins 2 semaines de selectionées
+    selected_weeks = []
+    for i in range(len(week_list)):
+        if weeks_check_button[i].get() == 1:
+            selected_weeks.append(week_list[i])
+    
+    if len(selected_weeks) < 2:
+        return
+
+
+     # Affiche le graph pour un paramètre donné
+    for i in range(len(param_check_button)):
+        if param_check_button[i].get() == 1:
+            compute(parameter_list[i])
 
     plt.show()
 
-def go_from_keyboard_event(event):
-    go_graph()
+def read_excel_data_from_event(event):
+    read_excel_data()
 
-def collect_data(param, plot_id):
-    # Reducing excel sheet to only parameter's data
-    data_param = raw_data.iloc[0:, param_col[param]:(param_col[param]+1)]
+def read_excel_data():
+    global path
+    path = e1.get()
+    load_excel_data()
+    hide_file_browse()
+    display_settings()
 
-    # Renaming serie with friendly param name
-    data_param = data_param.rename(columns={param_col[param]: param})
+def load_excel_data():
+    global parameter_list
+    global sample_list
+    global raw_data
+    global week_start_line
+    global week_list
+    global week_days_from_start
 
-    # Getting each week param values in a dictionary
-    data = {}
-    for week, has_to_be_plotted in week_to_plot.items():
-        if has_to_be_plotted == 1:
-            data[week] = extract_week_data(data_param, week)
+    # Read excel file
+    raw_data = pd.read_excel(path, sheet_name="Données",index_col=None, header=None)
 
-    # Affichage du graphe
-    plot_view(data, param, plot_id)
+    parameter_list = raw_data.iloc[6:7].values[0]
+    parameter_list = [x for x in parameter_list if pd.isnull(x) == False]
 
-def settings_view():
-    global setting_view_opened
+    week_list = []
+    week_days_from_start = {}
+    week_start_line = {}
+    sample_list = []
+    first_sample_found = False
+    last_sample_found = False
 
-    if setting_view_opened == False:
-        if param_view_opened == False:
-            window.geometry("450x290")
-            text_version.place(x = 20, y = 260)
+    week_row = raw_data.iloc[:,2]
+    days_row = raw_data.iloc[:,1]
+    for index in range(len(week_row)):
 
-        button_setting.config(text="Réglages avancés -")   
-        text_param.place(x = 20, y = 103)
-        entry_param.place(x = 255, y = 100)
-        text_sample_col.place(x = 20, y = 143)
-        entry_sample_col.place(x = 255, y = 140)
-        text_sample_1.place(x = 20, y = 183)
-        entry_sample_1.place(x = 255, y = 180)
-        text_sample_nb.place(x = 20, y = 223)
-        entry_sample_nb.place(x = 255, y = 220)
-        setting_view_opened = True
-    else:
-        if param_view_opened == False:
-            window.geometry("450x110")
-            text_version.place_forget()
+        if first_sample_found == True:
+            if last_sample_found == False:
+                if str(week_row[index])[:1] == "A":
+                    last_sample_found = True
+                else:
+                    sample_list.append(week_row[index][0])
 
-        button_setting.config(text="Réglages avancés +")
-        text_param.place_forget()
-        entry_param.place_forget()
-        text_sample_col.place_forget()
-        entry_sample_col.place_forget()
-        text_sample_1.place_forget()
-        entry_sample_1.place_forget()
-        text_sample_nb.place_forget()
-        entry_sample_nb.place_forget()
-        setting_view_opened = False
+            if str(week_row[index])[:1] == "A":
+                week_name = 'T'+ week_row[index][1:]
+                week_list.append(week_name)
+                week_start_line[week_name] = index
+                try:
+                    week_days_from_start[week_name] = int(days_row[index])
+                except:
+                    week_days_from_start[week_name] = days_row[index]
+
+        elif str(week_row[index])[:1]== "A":
+            first_sample_found = True
+            sample_list.append(week_row[index][0])
+            week_name = 'T'+ week_row[index][1:]
+            week_list.append(week_name)
+            week_start_line[week_name] = index
+            n = days_row[index]
+            week_days_from_start[week_name] = int(days_row[index])
+
+
+def hide_file_browse():
+    l1.place_forget()
+    e1.place_forget()
+    b1.place_forget()
+    btn.place_forget()
+
+def display_settings():
+    global sample_check_button
+    global param_check_button
+    global weeks_check_button
+    global error_visibility
+    global e_alpha_error
+    global grid_visibility
+
+    upper_text_px_height = 0
+
+    l5 = tk.Label(window, text = "Echantillons")
+    l5.place(x = 10, y = upper_text_px_height+20)
+
+    sample_check_button = [0]*len(sample_list)
+    i = 0
+    x_offset=0
+    y_offset=0
+    for sample in sample_list:
+        sample_check_button[i] = tk.IntVar()
+        e = tk.Checkbutton(window, variable=sample_check_button[i], text=sample, onvalue=1, offvalue=0, fg=color_list[i])
+        e.place(x = 100 + (40*x_offset), y = upper_text_px_height + 20 + (20*y_offset))
+        e.select()
+        i+=1
+        x_offset+=1
+        if (i%12 == 0):
+            y_offset+=1
+            x_offset=0
+
+    upper_text_px_height += (y_offset+1) * 20 
+
+    l6 = tk.Label(window, text = "Paramètres")
+    l6.place(x = 10, y = upper_text_px_height+20)
+
+    param_check_button = [0]*len(parameter_list)
+    i = 0
+    x_offset=0
+    y_offset=0
+    for param in parameter_list:
+        param_check_button[i] = tk.IntVar()
+        e = tk.Checkbutton(window, variable=param_check_button[i], text=param, onvalue=1, offvalue=0)
+        e.place(x = 100 + (90*x_offset), y = upper_text_px_height + 20 + (20*y_offset))
+        i+=1
+        x_offset+=1
+        if (i%8 == 0):
+            y_offset+=1
+            x_offset=0
+
+    upper_text_px_height += 20 + (y_offset+1) * 20 
+
+    
+    l7 = tk.Label(window, text = "Période")
+    l7.place(x = 10, y = upper_text_px_height+20)
+
+    weeks_check_button = [0]*len(week_list)
+    i = 0
+    x_offset=0
+    y_offset=0
+    c = 'T0'
+    for week in week_list:
+
+        if (c != week[:2]):
+            c = week[:2]
+            y_offset+=1
+            x_offset=0
+
+        weeks_check_button[i] = tk.IntVar()
+        e = tk.Checkbutton(window, variable=weeks_check_button[i], text=week+" (j"+str(week_days_from_start[week])+")", onvalue=1, offvalue=0)
+        e.place(x = 100 + (100*x_offset), y = upper_text_px_height + 20 + (20*y_offset))
+        i+=1
+        x_offset+=1
+
+    upper_text_px_height += 40 + (y_offset+1) * 20
+
+    l8 = tk.Label(window, text = "Barre d'erreur")
+    l8.place(x = 10, y = upper_text_px_height+20)
+    error_visibility = tk.IntVar()
+    cb_error_visibility = tk.Checkbutton(window, variable=error_visibility, onvalue=1, offvalue=0)
+    cb_error_visibility.place(x = 100, y = upper_text_px_height + 20)
+    cb_error_visibility.select()
+    
+    l_alpha_error = tk.Label(window, text = "Transparence (%)")
+    l_alpha_error.place(x = 150, y = upper_text_px_height+20)
+    e_alpha_error = tk.Entry(window, width=3)
+    e_alpha_error.place(x = 250, y = upper_text_px_height + 20)
+    e_alpha_error.insert(-1, '10')
+
+    upper_text_px_height += 40
+
+    l10 = tk.Label(window, text = "Quadrillage")
+    l10.place(x = 10, y = upper_text_px_height+20)
+    grid_visibility = tk.IntVar()
+    cb_grid_visibility = tk.Checkbutton(window, variable=grid_visibility, onvalue=1, offvalue=0)
+    cb_grid_visibility.place(x = 100, y = upper_text_px_height + 20)
+    cb_grid_visibility.select()
+
+    upper_text_px_height += 40
+
+    l4.place(x = 10, y = upper_text_px_height + 40)
+    btn = tk.Button(window, text = "Dessiner", command=compute_data, width=20)
+    btn.place(x = 370, y = upper_text_px_height + 30)
+    window.bind('<Return>', compute_data_from_event)
+    window.geometry("1160x"+str(upper_text_px_height+80))
+
 
 if __name__ == '__main__':
-    global window
+    
     window = tk.Tk()
-    window.title("excel2graph")
-    window.geometry("450x110")
+    window.title("Excel2graph")
+    if "nt" == os.name:
+        window.iconbitmap('./icv.ico')
+    else:
+        window.iconbitmap('@icv.xbm')
+    window.geometry("430x100")
     window.resizable(0, 0)
 
-    text_path = tk.Label(window, text = "Fichier excel")
-    text_path.place(x = 20, y = 23)
-    entry_path = tk.Entry(window, bd = 3, width=15)
-    entry_path.place(x = 140, y = 20)
-    button_path=tk.Button(window, text = "Chercher...", command=load_file, width=10)
-    button_path.place(x = 300, y = 20)
+    l1 = tk.Label(window, text = "Fichier excel")
+    l1.place(x = 10, y = 20)
+    e1 = tk.Entry(window, bd = 5)
+    e1.place(x = 140, y = 20)
+    b1=tk.Button(window, text = "Chercher...", command=browsefunc)
+    b1.place(x = 320, y = 20)    
+    btn = tk.Button(window, text = "Ouvrir", command=read_excel_data, width=20)
+    btn.place(x = 220, y = 60)
+    l4 = tk.Label(window, text = "Version 2022.03.08-22h31")
+    l4.place(x = 10, y = 70)
 
-    button_setting=tk.Button(window, text = "Réglages avancés +", command=settings_view, width=15)
-    button_setting.place(x = 20, y = 63)
-
-    text_param = tk.Label(window, text = "Ligne des paramètres")
-    entry_param = tk.Entry(window, bd = 3, width=2)
-    entry_param.insert(tk.END, "7")
-
-    text_sample_col = tk.Label(window, text = "Colonne des échantillons")
-    entry_sample_col = tk.Entry(window, bd = 3, width=2)
-    entry_sample_col.insert(tk.END, "C")
-
-    text_sample_1 = tk.Label(window, text = "Premier échantillon")
-    entry_sample_1 = tk.Entry(window, bd = 3, width=2)
-    entry_sample_1.insert(tk.END, "A0")
-
-    text_sample_nb = tk.Label(window, text = "Nombre d'échantillons")
-    entry_sample_nb = tk.Entry(window, bd = 3, width=2)
-    entry_sample_nb.insert(tk.END, "12")
-
-    btn_go = tk.Button(window, text = "Go !", command=go_graph, width=20)
-
-    text_version = tk.Label(window, text = "Version 2021.11.13")
-
-    window.bind('<Return>', go_from_keyboard_event)
+    window.bind('<Return>', read_excel_data_from_event)
     
     window.mainloop()
 
